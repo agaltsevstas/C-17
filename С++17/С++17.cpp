@@ -1,4 +1,5 @@
 #include <iostream>
+#include <bitset>
 #include <cassert>
 #include <optional>
 #include <variant>
@@ -11,6 +12,9 @@
 #include <string_view>
 #include <tuple>
 #include <vector>
+
+
+// Сайты: http://scrutator.me/post/2018/05/25/cpp17_lang_features_p4.aspx
 
 
 struct [[nodiscard]] Example
@@ -47,20 +51,45 @@ int DoExmapleCall()
     return 10;
 }
 
+std::ostream& operator<<(std::ostream& os, std::byte b)
+{
+    return os << std::bitset<8>(std::to_integer<int>(b));
+}
+
+
 int main()
 {
     setlocale(LC_ALL, "Russian"); // Нужно сохранить файл с кодировкой Кириллица (Windows) - кодовая страница 1251
     int value = 5;
-
+    
     /// Декомпозиция std::tuple, std::pair, std::map, struct
     auto [a, b, c] = std::tuple(1, "hello", 0.1);
     auto [value1, value2] = std::pair{"hello", 1};
     //auto [a, b] = std::map{ "hello", 1 };
     auto [title, year] = Example();
-
+    
     /// Игнорирование одного из параметров при декомпозиции
     int number1;
     std::tie(number1, std::ignore) = std::tuple(2, 3);
+    
+    /*
+     Тип std::byte - является более типобезопасным, чем char, unsigned char или uint8_t. К std::byte можно применить только побитовые операции, а арифметические операции и неявные преобразования недоступны. Использовать std::byte при работе с 'сырой' памятью, когда хранилище представляет собой просто последовательность байтов, а не массив символов
+
+     Определение типа std::byte:
+     enum class byte : unsigned char {};
+     */
+    {
+        std::cout << "std::byte" << std::endl;
+        std::byte b {42};
+        std::cout << "1. " << b << '\n';
+//         b *= 2 // Ошибка
+        b <<= 1;
+        std::cout << "2. " << b << '\n';
+        b >>= 1;
+        std::cout << "3. " << b << '\n';
+        std::cout << "4. " << (b << 1) << '\n';
+        std::cout << "5. " << (b >> 1) << '\n';
+    }
 
     /*
     * Агрегатная инициализация (композиция или Структурированные привязки)  — форма инициализации списка для массивов и типов классов (часто структур и объединений), со следующими характеристиками:
@@ -382,6 +411,19 @@ int main()
         for (int num : numbers) 
             std::cout << num << ' ';
         std::cout << std::endl;
+    }
+    /*
+     lambda - могут быть constexpr, но с C++20 идет по-умолчанию, так что писать необязательно
+     */
+    {
+        constexpr int y = 32;
+        constexpr auto answer = [y]()
+        {
+            constexpr int x = 10;
+            return x + y;
+        };
+        
+        auto result = answer();
     }
 
     return 0;
