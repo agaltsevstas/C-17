@@ -190,6 +190,58 @@ namespace SFINAE
     }
 }
 
+namespace STRING_VIEW
+{
+    /*
+     Разделяет строку на слова через 2 указателя
+     Time: O(n)
+     Memory: O(n)
+     */
+    std::vector<std::string> split_by_space_string(const std::string& text, std::string delims = " ")
+    {
+        std::vector<std::string> result;
+        size_t first = 0;
+
+        while (first < text.size()) // проверяем указатель на выход за переделы
+        {
+            size_t second = text.find(delims, first); // поиск с определенного индекса
+            if (second == std::string::npos)
+                break;
+
+            if (first != second) // пробел найден
+                result.emplace_back(text.substr(first, second - first));
+
+            first = second + 1; // пропускаем пробел
+        }
+
+        return result;
+    }
+    /*
+     Разделяет строку на слова через 2 указателя
+     Time: O(n)
+     Memory: O(1) - string_view, но если строка изменится или выйдет за пределы видимости стека, то UB.
+     */
+    std::vector<std::string_view> split_by_space_string_view(const std::string_view& text, const std::string_view& delims = " ")
+    {
+        std::vector<std::string_view> result;
+        size_t first = 0;
+
+        while (first < text.size()) // проверяем указатель на выход за переделы
+        {
+            size_t second = text.find(delims, first); // поиск с определенного индекса
+            if (second == std::string_view::npos)
+                break;
+            
+            if (first != second) // пробел найден
+                result.emplace_back(text.substr(first, second - first));
+
+            first = second + 1; // пропускаем пробел
+        }
+
+        return result;
+    }
+}
+
 namespace VARIANT
 {
     template<class... Ts>
@@ -327,11 +379,12 @@ int main()
         std::cout << "5. " << (b >> 1) << '\n';
     }
     /*
-     std::string_view - это просто пара значений, указатель на последовательность и размер. string_view уместен везде, где не требуется копия. Так как string_view не является владельцем данных, то если строка исчезнет, то не будет информации, что std::string_view перестал быть валидным. Время жизни string_view не зависит от времени жизни строки, которую он представляет. Однако, если отображаемая строка выйдет за пределы области видимости, то string_view больше не сможет её отображать и при попытке доступа получится неопределенный результат. string_view не гарантирует наличие нулевого символа на конце. Можно использовать инициализировать во время компиляции constexpr, в отличии string
-     remove_prefix и remove_suffix, которые отсекают от видимого диапазона string_view заданное число символов с начала или с конца; исходная строка не меняется, а меняется только наблюдаемый диапазон.
-     В параметрах всех функций и методов вместо const string& следует использовать невладеющий string_view, но возвращать владеющий string.
+     std::string_view — обертка над string или обычным C-строке, которая ссылается на данные и хранит в себе указатель на последовательность (const char*) и размер (size) и в отличие от string не выделяет, а переиспользует память.
+        Назначение string_view - избежать копирования данных и уместен везде, где не требуется копия string и используется для ТОЛЬКО чтения, для записи - нет. Так как string_view не является владельцем данных, то если строка выйдет за пределы области видимости/изменится, то данные в string_view станут UB. Можно использовать инициализировать во время компиляции constexpr, в отличии string. string_view не гарантирует наличие нулевого символа на конце.
      */
     {
+        using namespace STRING_VIEW;
+        
         auto String = [&]() -> std::string_view
         {
             std::string str("hello");
@@ -358,6 +411,10 @@ int main()
         str_view.remove_suffix(2); // Игнорируем последние 2 символа
 
         str = "example"; // strView будет теперь хранить "xa" без первого и двух последних символов с учетом изменения размера с 5 до 2
+        
+        std::string text("some very long long text");
+        std::vector<std::string> words_string = split_by_space_string(text);
+        std::vector<std::string_view> words_string_view = split_by_space_string_view(text);
     }
     /*
      std::variant - тип данных, который умеет хранить и объединять в себе несколько типов данных.
