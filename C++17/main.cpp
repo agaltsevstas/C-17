@@ -409,14 +409,14 @@ int main()
         
         auto String = [&]() -> std::string_view
         {
-            std::string str("hello"); // память выделена в куче (heap)
+            std::string str("Hello World, string_view!"); // память выделена в куче (heap)
             std::string_view str_view(str);
             return str_view;
         };
         
         auto String_View = [&]() -> std::string_view
         {
-            constexpr std::string_view str_view("hello"); // память выделена на стеке (stack)
+            constexpr std::string_view str_view("Hello World, string_view!"); // память выделена на стеке (stack)
             return str_view;
         };
         
