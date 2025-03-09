@@ -219,7 +219,7 @@ namespace STRING_VIEW
     /*
      Разделяет строку на слова через 2 указателя
      Time: O(n)
-     Memory: O(1) - string_view, но если строка изменится или выйдет за пределы видимости стека, то UB.
+     Memory: O(1) - string_view, но если строка изменится или выйдет за пределы видимости стека, то undefined behavior (UB).
      */
     std::vector<std::string_view> split_by_space_string_view(const std::string_view& text, const std::string_view& delims = " ")
     {
@@ -271,6 +271,27 @@ int main()
             [[maybe_unused]] auto [value1, value2] = std::pair{"hello", 1};
             //auto [a, b] = std::map{ "hello", 1 };
             [[maybe_unused]] auto [title, year] = Example();
+        }
+    }
+    /*
+     CTAD (class template argument deduction) - автоматическое определение типа параметра контейнера, без явного указания типа: вместо foo<...>(...) можно foo(...).
+     Недостаток для std::array: типы uint16_t, short будут проигрывать int; std::string_view будет проигрывать const char* и т.д, поэтому в C++20 появился std::to_array, позволяющий не указывать размер std::array, а указывать только тип.
+     */
+    {
+        // До C++17: при инстанцировании шаблона функции нужно было явно указывать типы аргументы: foo<...>(...).
+        {
+            [[maybe_unused]] std::vector<int> vec = {1, 2, 3, 4, 5};
+            [[maybe_unused]] constexpr std::array<int, 5> arr = {1, 2, 3, 4, 5}; // для типов
+        }
+        // С++17
+        {
+            [[maybe_unused]] std::vector vec = {1, 2, 3, 4, 5};
+            [[maybe_unused]] constexpr std::array arr_numbers = {1, 2, 3, 4, 5}; // std::array<int, 5>
+            [[maybe_unused]] constexpr std::array arr_names = {"Mary", "Patricia", "Linda", "Barbara", "Elizabeth"}; // array<const char*, 5>
+        }
+        // С++20: std::to_array - позволяет не указывать размер std::array, а указывать только тип. Решает проблему CTAD.
+        {
+            [[maybe_unused]] constexpr auto names = std::to_array<std::string_view>({"Mary", "Patricia", "Linda", "Barbara", "Elizabeth"});
         }
     }
     /// static inline member class
@@ -380,21 +401,22 @@ int main()
     }
     /*
      std::string_view — обертка над string или обычным C-строке, которая ссылается на данные и хранит в себе указатель на последовательность (const char*) и размер (size) и в отличие от string не выделяет, а переиспользует память.
-        Назначение string_view - избежать копирования данных и уместен везде, где не требуется копия string и используется для ТОЛЬКО чтения, для записи - нет. Так как string_view не является владельцем данных, то если строка выйдет за пределы области видимости/изменится, то данные в string_view станут UB. Можно использовать инициализировать во время компиляции constexpr, в отличии string. string_view не гарантирует наличие нулевого символа на конце.
+        Назначение string_view - избежать копирования данных и уместен везде, где не требуется копия string и используется для ТОЛЬКО чтения, для записи - нет. Так как string_view не является владельцем данных, то если строка выйдет за пределы области видимости/изменится, то данные в string_view станут undefined behavior (UB). Можно использовать инициализировать во время компиляции constexpr, в отличии string. string_view не гарантирует наличие нулевого символа на конце.
+     data() - возвращает исходную строку в C-style. Метод следует использовать, когда объект std::string_view не был изменен (например, при помощи remove_prefix() или remove_suffix()) и имеет нулевой символ '\0' (так как это строка C-style), иначе undefined behavior (UB). Чтобы использовать модифицированную строку string_view c новым буфером, отбросив старый, нужно создать новую строку.
      */
     {
         using namespace STRING_VIEW;
         
         auto String = [&]() -> std::string_view
         {
-            std::string str("hello");
+            std::string str("hello"); // память выделена в куче (heap)
             std::string_view str_view(str);
             return str_view;
         };
         
         auto String_View = [&]() -> std::string_view
         {
-            std::string_view str_view("hello");
+            constexpr std::string_view str_view("hello"); // память выделена на стеке (stack)
             return str_view;
         };
         
@@ -407,8 +429,24 @@ int main()
         std::string str("hello");
         std::string_view str_view(str);
 
-        str_view.remove_prefix(1); // Игнорируем первый символ
-        str_view.remove_suffix(2); // Игнорируем последние 2 символа
+        /*
+         data() - возвращает исходную строку в C-style. Метод следует использовать, когда объект std::string_view не был изменен (например, при помощи remove_prefix() или remove_suffix()) и имеет нулевой символ '\0' (так как это строка C-style), иначе undefined behavior (UB).
+         */
+        {
+            str_view.remove_suffix(2); // Игнорируем последние 2 символа
+            std::cout << "Доступ к исходной строке string_view: " << str_view.data() << std::endl; // Выведет: hello, а должен hel
+            
+            str_view.remove_prefix(1); // Игнорируем первый символ
+            std::cout << "Доступ к исходной строке string_view: " << str_view.data() << std::endl; // Выведет: ello, а должен el
+            
+            // 1 Способ: создание новый строки
+        }
+        /* Решение для data(): чтобы использовать модифицированную строку string_view c новым буфером, отбросив старый, нужно создать новую строку, используя 2 способа:
+         */
+        {
+            [[maybe_unused]] auto new_string1 = std::string(str_view.data(), str_view.size());
+            [[maybe_unused]] auto new_string2 = std::string(str_view);
+        }
 
         str = "example"; // strView будет теперь хранить "xa" без первого и двух последних символов с учетом изменения размера с 5 до 2
         
